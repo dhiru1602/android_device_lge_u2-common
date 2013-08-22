@@ -203,6 +203,8 @@
 #define HEADSET_VOLUME                        -12
 #define HEADPHONE_VOLUME                      -12
 
+#define BLUETOOTH_MIC_VOLUME                  -18
+
 /* product-specific defines */
 #define PRODUCT_DEVICE_PROPERTY "ro.product.device"
 #define PRODUCT_DEVICE_BLAZE    "blaze"
@@ -331,7 +333,7 @@ struct route_setting defaults[] = {
     /* bt */
     {
         .ctl_name = MIXER_BT_UL_VOLUME,
-        .intval = MIXER_ABE_GAIN_0DB,
+        .intval = DB_TO_ABE_GAIN(BLUETOOTH_MIC_VOLUME),
     },
     {
         .ctl_name = NULL,
@@ -2753,7 +2755,7 @@ static int adev_set_mic_mute(struct audio_hw_device *dev, bool state)
         for (channel = 0; channel < mixer_ctl_get_num_values(
                 adev->mixer_ctls.bt_ul_volume); channel++) {
             mixer_ctl_set_value(adev->mixer_ctls.bt_ul_volume,
-                   channel, (state ? 0 : DB_TO_ABE_GAIN(6)));
+                   channel, (state ? 0 : DB_TO_ABE_GAIN(BLUETOOTH_MIC_VOLUME)));
         }
     }
 
