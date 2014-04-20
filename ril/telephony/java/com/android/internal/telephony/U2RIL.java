@@ -188,7 +188,6 @@ public class U2RIL extends RIL implements CommandsInterface {
 
         switch(response) {
             case RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED: ret =  responseVoid(p); break;
-            case RIL_UNSOL_ON_USSD: ret =  responseStrings(p); break;
             case RIL_UNSOL_LGE_XCALLSTAT: ret =  responseInts(p); break;
             case RIL_UNSOL_LGE_SELECTED_SPEECH_CODEC: ret =  responseVoid(p); break;
             case RIL_UNSOL_LGE_BATTERY_LEVEL_UPDATE: ret =  responseVoid(p); break;
@@ -246,29 +245,6 @@ public class U2RIL extends RIL implements CommandsInterface {
                     setNetworkSelectionModeAutomatic(null);
                 }
                 return;
-            case RIL_UNSOL_ON_USSD:
-                String[] resp = (String[])ret;
-
-                if (resp.length < 2) {
-                    resp = new String[2];
-                    resp[0] = ((String[])ret)[0];
-                    resp[1] = null;
-                }
-                if (resp[1].length()%2 == 0 && resp[1].matches("[0-9A-F]+")) {
-                    try { 
-                        resp[1] = new String(hexStringToByteArray(resp[1]), "UTF-16");
-                    } catch (java.io.UnsupportedEncodingException uex) { 
-                        // encoding not supported, should never get here 
-                    } catch (java.io.IOException iox) { 
-                        // you will get here if the original sequence wasn't UTF-8 or ASCII 
-                    } 
-                }
-                if (RILJ_LOGD) unsljLogMore(response, resp[0]);
-                if (mUSSDRegistrant != null) {
-                    mUSSDRegistrant.notifyRegistrant(
-                        new AsyncResult (null, resp, null));
-                }
-                break;
             case 1080: // RIL_UNSOL_LGE_FACTORY_READY (NG)
                 /* Adjust request IDs */
                 RIL_REQUEST_HANG_UP_CALL = 0xb7;
