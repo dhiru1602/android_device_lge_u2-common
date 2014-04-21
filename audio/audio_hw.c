@@ -205,17 +205,6 @@
 
 #define BLUETOOTH_MIC_VOLUME                  -18
 
-/* product-specific defines */
-#define PRODUCT_DEVICE_PROPERTY "ro.product.device"
-#define PRODUCT_DEVICE_BLAZE    "blaze"
-#define PRODUCT_DEVICE_TABLET   "blaze_tablet"
-#define PRODUCT_DEVICE_PANDA    "panda"
-
-enum supported_boards {
-    OMAP4_BLAZE,
-    OMAP4_TABLET,
-};
-
 enum tty_modes {
     TTY_MODE_OFF,
     TTY_MODE_VCO,
@@ -604,8 +593,6 @@ struct omap_audio_device {
     struct omap_stream_out *active_output;
     bool mic_mute;
     int tty_mode;
-    int sidetone_capture;
-    int board_type;
     struct echo_reference_itfe *echo_reference;
     int input_requires_stereo;
     bool low_power;
@@ -739,40 +726,6 @@ static void setup_stereo_to_mono_input_remix(struct omap_stream_in *in)
     in->remix_at_driver = br;
 }
 
-static int get_boardtype(struct omap_audio_device *adev)
-{
-    char board[PROPERTY_VALUE_MAX];
-    int status = 0;
-    int board_type = 0;
-
-    LOGFUNC("%s(%p)", __FUNCTION__, adev);
-
-    property_get(PRODUCT_DEVICE_PROPERTY, board, "UNKNOWN");
-    if(!strcmp(board, "UNKNOWN")) {
-         return -ENODEV;
-    }
-
-    /* return true if the property matches the given value */
-    if(!strcmp(board, PRODUCT_DEVICE_BLAZE)) {
-            adev->board_type = OMAP4_BLAZE;
-          /*true on devices that must use sidetone capture */
-            adev->sidetone_capture = 1;
-    }
-    else if(!strcmp(board, PRODUCT_DEVICE_TABLET)) {
-            adev->board_type = OMAP4_TABLET;
-            adev->sidetone_capture = 0;
-    }
-    else {
-            adev->board_type = OMAP4_BLAZE;
-          /*true on devices that must use sidetone capture */
-            adev->sidetone_capture = 0;
-        //return -EINVAL;
-    }
-
-    ALOGI("boardtype used: %s(%d)", board, adev->board_type);
-
-    return 0;
-}
 /* The enable flag when 0 makes the assumption that enums are disabled by
  * "Off" and integers/booleans by 0 */
 
@@ -898,15 +851,9 @@ static void set_input_volumes(struct omap_audio_device *adev, int main_mic_on,
         /* determine input volume by use case */
         switch (adev->active_input->source) {
         case AUDIO_SOURCE_MIC: /* general capture */
-            if(adev->board_type == OMAP4_BLAZE) {
-                volume = DB_TO_ABE_GAIN(main_mic_on ? CAPTURE_MAIN_MIC_VOLUME :
+            volume = DB_TO_ABE_GAIN(main_mic_on ? CAPTURE_MAIN_MIC_VOLUME :
                     (headset_mic_on ? CAPTURE_HEADSET_MIC_VOLUME :
                     (sub_mic_on ? CAPTURE_SUB_MIC_VOLUME : 0)));
-            }else if(adev->board_type == OMAP4_TABLET) {
-                volume = DB_TO_ABE_GAIN(main_mic_on ? CAPTURE_DIGITAL_MIC_VOLUME :
-                    (headset_mic_on ? CAPTURE_HEADSET_MIC_VOLUME :
-                     (sub_mic_on ? CAPTURE_SUB_MIC_VOLUME : 0)));
-            }
             break;
 
         case AUDIO_SOURCE_CAMCORDER:
@@ -933,16 +880,8 @@ static void set_input_volumes(struct omap_audio_device *adev, int main_mic_on,
         }
     }
 
-    for (channel = 0; channel < 2; channel++) {
-        if(adev->board_type == OMAP4_BLAZE) {
+    for (channel = 0; channel < 2; channel++)
             mixer_ctl_set_value(adev->mixer_ctls.amic_ul_volume, channel, volume);
-        }else if(adev->board_type == OMAP4_TABLET) {
-            if (headset_mic_on)
-                mixer_ctl_set_value(adev->mixer_ctls.amic_ul_volume, channel, volume);
-            else
-                mixer_ctl_set_value(adev->mixer_ctls.dmic1_ul_volume, channel, volume);
-        }
-    }
 }
 
 static void set_output_volumes(struct omap_audio_device *adev)
@@ -1177,41 +1116,29 @@ static void select_output_device(struct omap_audio_device *adev)
                     if (headset_on || headphone_on || earpiece_on)
                         set_route_by_array(adev->mixer, vx_ul_amic_left, 1);
                     else if (speaker_on) {
-                        if(adev->board_type == OMAP4_BLAZE)
-                            set_route_by_array(adev->mixer, vx_ul_amic_right, 1);
-                        else if(adev->board_type == OMAP4_TABLET)
-                            set_route_by_array(adev->mixer, vx_ul_dmic0,1);
+                        set_route_by_array(adev->mixer, vx_ul_amic_right, 1);
                     }
                     else {
-                        if(adev->board_type == OMAP4_BLAZE)
-                            set_route_by_array(adev->mixer, vx_ul_amic_left, 0);
-                        else if(adev->board_type == OMAP4_TABLET)
-                            set_route_by_array(adev->mixer, vx_ul_dmic0,0);
+                        set_route_by_array(adev->mixer, vx_ul_amic_left, 0);
                     }
-                    if(adev->board_type == OMAP4_BLAZE) {
-                        mixer_ctl_set_enum_by_string(adev->mixer_ctls.left_capture,
-                                (earpiece_on || headphone_on) ? MIXER_MAIN_MIC :
-                                (headset_on ? MIXER_HS_MIC : "Off"));
-                        mixer_ctl_set_enum_by_string(adev->mixer_ctls.right_capture,
-                                speaker_on ? MIXER_SUB_MIC : "Off");
-                        mixer_ctl_set_enum_by_string(mixer_get_ctl_by_name(adev->mixer,
-                                    "Earpiece FIR Enable"), ((earpiece_on || headphone_on || speaker_on) ? "On" : "Off"));
-                        mixer_ctl_set_enum_by_string(mixer_get_ctl_by_name(adev->mixer,
-                                    "Main MIC bias Enable"), ((earpiece_on || headphone_on || speaker_on) ? "On" : "Off"));
-                        /* Cut off feedback from the submic to the DAC */
-                        /*mixer_ctl_set_enum_by_string(mixer_get_ctl_by_name(adev->mixer,
+                    mixer_ctl_set_enum_by_string(adev->mixer_ctls.left_capture,
+                            (earpiece_on || headphone_on) ? MIXER_MAIN_MIC :
+                            (headset_on ? MIXER_HS_MIC : "Off"));
+                    mixer_ctl_set_enum_by_string(adev->mixer_ctls.right_capture,
+                            speaker_on ? MIXER_SUB_MIC : "Off");
+                    mixer_ctl_set_enum_by_string(mixer_get_ctl_by_name(adev->mixer,
+                                "Earpiece FIR Enable"), ((earpiece_on || headphone_on || speaker_on) ? "On" : "Off"));
+                    mixer_ctl_set_enum_by_string(mixer_get_ctl_by_name(adev->mixer,
+                                "Main MIC bias Enable"), ((earpiece_on || headphone_on || speaker_on) ? "On" : "Off"));
+                    /* Cut off feedback from the submic to the DAC */
+                    /*mixer_ctl_set_enum_by_string(mixer_get_ctl_by_name(adev->mixer,
                                     MIXER_HF_RIGHT_PLAYBACK), (speaker_on ? "Off" : MIXER_PLAYBACK_HF_DAC));*/
-                    } else if(adev->board_type == OMAP4_TABLET) {
-                        mixer_ctl_set_enum_by_string(adev->mixer_ctls.left_capture,
-                                (headset_on ? MIXER_HS_MIC : "Off"));
-                        mixer_ctl_set_enum_by_string(adev->mixer_ctls.right_capture, "off");
-                    }
 
                     set_input_volumes(adev, earpiece_on || headphone_on,
                             headset_on, speaker_on);
 
                     /* enable sidetone mixer capture if needed */
-                    sidetone_capture_on = earpiece_on && adev->sidetone_capture;
+                    sidetone_capture_on = earpiece_on;
                 }
                 set_incall_device(adev);
             }
@@ -1252,42 +1179,23 @@ static void select_input_device(struct omap_audio_device *adev)
         if (bt_on)
             set_route_by_array(adev->mixer, mm_ul2_bt, 1);
         else {
-            if(adev->board_type == OMAP4_BLAZE) {
-                /* Select front end */
-                if (main_mic_on || headset_on)
-                    set_route_by_array(adev->mixer, mm_ul2_amic_left, 1);
-                else if (sub_mic_on)
-                    set_route_by_array(adev->mixer, mm_ul2_amic_right, 1);
-                else
-                    set_route_by_array(adev->mixer, mm_ul2_amic_left, 0);
-                /* Select back end */
-                mixer_ctl_set_enum_by_string(adev->mixer_ctls.right_capture,
-                        sub_mic_on ? MIXER_SUB_MIC : "Off");
-                mixer_ctl_set_enum_by_string(adev->mixer_ctls.left_capture,
-                        main_mic_on ? MIXER_MAIN_MIC :
-                        (headset_on ? MIXER_HS_MIC : "Off"));
-                mixer_ctl_set_enum_by_string(mixer_get_ctl_by_name(adev->mixer,
-                            "Earpiece FIR Enable"), ((main_mic_on || sub_mic_on) ? "On" : "Off"));
-                mixer_ctl_set_enum_by_string(mixer_get_ctl_by_name(adev->mixer,
-                            "Main MIC bias Enable"), ((main_mic_on || sub_mic_on) ? "On" : "Off"));
-            } else if(adev->board_type == OMAP4_TABLET) {
-                /* Select front end */
-                if (headset_on)
-                    set_route_by_array(adev->mixer, mm_ul2_amic_left, 1);
-                else if (main_mic_on || sub_mic_on) {
-                    set_route_by_array(adev->mixer, mm_ul2_dmic0, 1);
-                    hw_is_stereo_only = 1;
-                } else {
-                    set_route_by_array(adev->mixer, mm_ul2_dmic0, 0);
-                    hw_is_stereo_only = 1;
-                }
-
-                /* Select back end */
-                mixer_ctl_set_enum_by_string(adev->mixer_ctls.right_capture, "off");
-                mixer_ctl_set_enum_by_string(adev->mixer_ctls.left_capture,
-                        main_mic_on ? "off" :
-                        (headset_on ? MIXER_HS_MIC : "Off"));
-            }
+            /* Select front end */
+            if (main_mic_on || headset_on)
+                set_route_by_array(adev->mixer, mm_ul2_amic_left, 1);
+            else if (sub_mic_on)
+                set_route_by_array(adev->mixer, mm_ul2_amic_right, 1);
+            else
+                set_route_by_array(adev->mixer, mm_ul2_amic_left, 0);
+            /* Select back end */
+            mixer_ctl_set_enum_by_string(adev->mixer_ctls.right_capture,
+                    sub_mic_on ? MIXER_SUB_MIC : "Off");
+            mixer_ctl_set_enum_by_string(adev->mixer_ctls.left_capture,
+                    main_mic_on ? MIXER_MAIN_MIC :
+                    (headset_on ? MIXER_HS_MIC : "Off"));
+            mixer_ctl_set_enum_by_string(mixer_get_ctl_by_name(adev->mixer,
+                        "Earpiece FIR Enable"), ((main_mic_on || sub_mic_on) ? "On" : "Off"));
+            mixer_ctl_set_enum_by_string(mixer_get_ctl_by_name(adev->mixer,
+                        "Main MIC bias Enable"), ((main_mic_on || sub_mic_on) ? "On" : "Off"));
         }
 
         adev->input_requires_stereo = hw_is_stereo_only;
@@ -3048,13 +2956,6 @@ static int adev_open(const hw_module_t* module, const char* name,
     adev->pcm_modem_ul = NULL;
     adev->voice_volume = 1.0f;
     adev->tty_mode = TTY_MODE_OFF;
-    if(get_boardtype(adev)) {
-        pthread_mutex_unlock(&adev->lock);
-        mixer_close(adev->mixer);
-        free(adev);
-        ALOGE("Unsupported boardtype, aborting.");
-        return -EINVAL;
-    }
 
     adev->input_requires_stereo = 0;
     adev->bluetooth_nrec = true;
