@@ -41,6 +41,7 @@ public class U2RIL extends RIL implements CommandsInterface {
     protected CallPathHandler mPathHandler;
 
     private int mCallPath = -1;
+    private boolean mCallInProgress = false;
 
     public U2RIL(Context context, int networkMode, int cdmaSubscription) {
         super(context, networkMode, cdmaSubscription);
@@ -179,6 +180,14 @@ public class U2RIL extends RIL implements CommandsInterface {
     static final int RIL_UNSOL_LGE_SIM_STATE_CHANGED_NEW = 1061;
     static final int RIL_UNSOL_LGE_SELECTED_SPEECH_CODEC = 1074;
 
+    private void WriteLgeCPATH(int path) {
+        RILRequest rrLSL = RILRequest.obtain(
+                           RIL_REQUEST_LGE_CPATH, null);
+        rrLSL.mParcel.writeInt(1);
+        rrLSL.mParcel.writeInt(path);
+        send(rrLSL);
+    }
+
     @Override
     protected void
     processUnsolicited (Parcel p) {
@@ -213,27 +222,24 @@ public class U2RIL extends RIL implements CommandsInterface {
                  * 6 - hangup
                  * 7 - answered
                  */
-                mCallPath = -1;
                 switch (xcallState) {
-                    case 0:
-                        mCallPath = 1;
-                        break;
-                    /*case 3:
-                    case 4:*/
-                    case 6:
-                        mCallPath = 0;
-                        break;
-                    default:
-                        break;
+                case 2:
+                case 4:
+                    WriteLgeCPATH(1);
+                    mCallPath = 1;
+                    mCallInProgress = true;
+                    break;
+                case 6:
+                    if (mCallPath != 1) {
+                        WriteLgeCPATH(1);
+                    }
+                    WriteLgeCPATH(0);
+                    mCallPath = 0;
+                    mCallInProgress = false;
+                    break;
                 }
+
                 if (RILJ_LOGD) riljLog("LGE call state change > " + intArray[1]);
-                if (mCallPath >= 0) {
-                    RILRequest rrLSL = RILRequest.obtain(
-                            RIL_REQUEST_LGE_CPATH, null);
-                    rrLSL.mParcel.writeInt(1);
-                    rrLSL.mParcel.writeInt(mCallPath);
-                    send(rrLSL);
-                }
 
                 break;
             case RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED:
@@ -273,19 +279,21 @@ public class U2RIL extends RIL implements CommandsInterface {
         private void checkSpeakerphoneState() {
             if (mCallState == TelephonyManager.CALL_STATE_OFFHOOK) {
                 int callPath = -1;
-                if (audioManager.isSpeakerphoneOn()) {
-                    callPath = 3;
+                if (mCallInProgress) {
+                    if (audioManager.isSpeakerphoneOn()) {
+                        callPath = 3;
+                    } else if (audioManager.isBluetoothScoOn()) {
+                        callPath = 4;
+                    } else {
+                        callPath = 1;
+                    }
                 } else {
-                    callPath = 1;
+                    callPath = 0;
                 }
 
                 if (callPath != mCallPath) {
                     mCallPath = callPath;
-                    RILRequest rrLSL = RILRequest.obtain(
-                            RIL_REQUEST_LGE_CPATH, null);
-                    rrLSL.mParcel.writeInt(1);
-                    rrLSL.mParcel.writeInt(callPath);
-                    send(rrLSL);
+                    WriteLgeCPATH(callPath);
                 }
 
                 Message msg = obtainMessage();
