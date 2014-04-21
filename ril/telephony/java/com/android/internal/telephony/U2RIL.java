@@ -164,16 +164,6 @@ public class U2RIL extends RIL implements CommandsInterface {
         send(rr);
     }
 
-    private static byte[] hexStringToByteArray(String s) {
-        int len = s.length();
-        byte[] data = new byte[len / 2];
-        for (int i = 0; i < len; i += 2) {
-            data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4)
-                    + Character.digit(s.charAt(i+1), 16));
-        }
-        return data;
-    }
-
     static final int RIL_UNSOL_LGE_BATTERY_LEVEL_UPDATE = 1050;
     static final int RIL_UNSOL_LGE_XCALLSTAT = 1053;
     static final int RIL_UNSOL_LGE_SIM_STATE_CHANGED = 1060;
