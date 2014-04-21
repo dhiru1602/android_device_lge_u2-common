@@ -115,13 +115,4 @@ BOARD_RIL_CLASS := ../../../device/lge/u2-common/ril/
 BOARD_CUSTOM_GRAPHICS := ../../../device/lge/u2-common/recovery-gfx.c
 BOARD_CHARGER_ENABLE_SUSPEND := true
 
-BOARD_SEPOLICY_DIRS := \
-    device/lge/u2-common/selinux
-
-BOARD_SEPOLICY_UNION := \
-    file_contexts \
-    pvrsrvinit.te \
-    device.te \
-    domain.te
-
 BOARD_HARDWARE_CLASS := device/lge/u2-common/cmhw/
