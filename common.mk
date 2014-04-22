@@ -177,5 +177,5 @@ PRODUCT_PACKAGES += \
     charger_res_images
 
 $(call inherit-product, frameworks/native/build/phone-xhdpi-1024-dalvik-heap.mk)
-$(call inherit-product-if-exists, hardware/broadcom/wlan/bcmdhd/firmware/bcm4329/device-bcm.mk)
+$(call inherit-product-if-exists, hardware/broadcom/wlan/bcmdhd/config/config-bcm.mk)
 $(call inherit-product, vendor/lge/u2-common/u2-vendor.mk)
