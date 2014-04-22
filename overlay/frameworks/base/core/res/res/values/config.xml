@@ -102,6 +102,8 @@
 
     <integer name="config_deviceHardwareKeys">7</integer>
 
+    <bool name="config_ui_enableFadingMarquee">false</bool>
+
     <!-- Disable lockscreen translucent decor by default -->
     <bool name="config_enableLockScreenTranslucentDecor">true</bool>
 
