@@ -361,6 +361,11 @@ service iprenew_bt-pan /system/bin/dhcpcd -n
     disabled
     oneshot
 
+service iprenew_eth0 /system/bin/dhcpcd -n
+    class main
+    disabled
+    oneshot
+
 service iprenew_p2p /system/bin/dhcpcd -nK
     class main
     disabled
