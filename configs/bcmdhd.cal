@@ -1,4 +1,4 @@
-# LG, U2(P760)-EU Rev.A 2012.05.31, (add by Ju Hyunchul, 2012.08.02)
+# LG, U2(P760)-EU Rev.A 2012.05.31, (add by Ju Hyunchul, 2012.08.02) , block pacalath2g
 
 manfid=0x2d0
 prodid=0x0532
@@ -59,7 +59,7 @@ rfreg033=0x19
 rfreg033_cck=0x1f
 txalpfbyp2g=1
 bphyscale=17
-pacalath2g=198
+#pacalath2g=198
 pacalidx2g=65
 pacalidx2g1=55
 dacrate2g=160
