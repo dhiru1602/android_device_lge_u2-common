@@ -351,6 +351,11 @@ service dhcpcd_bt-pan /system/bin/dhcpcd -ABKL
     disabled
     oneshot
 
+service dhcpcd_eth0 /system/bin/dhcpcd -ABDKL
+    class main
+    disabled
+    oneshot
+
 service iprenew_wlan0 /system/bin/dhcpcd -nK
     class main
     disabled
