@@ -31,7 +31,7 @@ BOARD_KERNEL_PAGESIZE := 2048
 BOARD_HAS_NO_SELECT_BUTTON := true
 TARGET_RECOVERY_FSTAB = device/lge/u2-common/fstab.u2
 RECOVERY_FSTAB_VERSION = 2
-BOARD_UMS_LUNFILE := "/sys/devices/virtual/android_usb/android0/f_mass_storage/lun%d/file"
+BOARD_UMS_LUNFILE := "/sys/devices/virtual/android_usb/android0/f_mass_storage/lun/file"
 TARGET_OTA_ASSERT_DEVICE := p760,p765,p768,u2
 
 # EGL
