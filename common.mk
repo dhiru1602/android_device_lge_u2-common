@@ -170,7 +170,8 @@ PRODUCT_PROPERTY_OVERRIDES += \
     ro.build.target_country=EU \
     ro.build.target_operator=OPEN \
     ro.bt.bdaddr_path=/sys/devices/platform/bd_address/bdaddr_if \
-    persist.sys.usb.config=mtp,adb
+    persist.sys.usb.config=mtp,adb \
+    ro.ksm.default=1
 
 # Charger mode
 PRODUCT_PACKAGES += \
