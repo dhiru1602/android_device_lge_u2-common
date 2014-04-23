@@ -28,6 +28,14 @@ int main() {
 	int i;
 
 	fd1 = open("/data/misc/wifi/macAddress",O_RDONLY);
+
+	// Don't write the config if the MAC is invalid
+	if (lseek(fd1, 0, SEEK_END) != 13) {
+		goto exit;
+	}
+
+	lseek(fd1, 0, SEEK_SET);
+
 	fd2 = open("/data/misc/wifi/config",O_WRONLY|O_CREAT|O_TRUNC,S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
 
 	write(fd2,"mpc=1\n",6);
@@ -48,7 +56,8 @@ int main() {
 	}
 
 	write(fd2,"\n",1);
-	close(fd1);
 	close(fd2);
+exit:
+	close(fd1);
 	return 0;
 }
