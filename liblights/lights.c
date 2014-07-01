@@ -36,8 +36,13 @@
 static pthread_once_t g_init = PTHREAD_ONCE_INIT;
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
 
+#ifdef BACKLIGHT_LM3530
+char const*const LCD_FILE
+        = "/sys/devices/platform/omap/omap_i2c.2/i2c-2/2-0038/brightness";
+#else
 char const*const LCD_FILE
         = "/sys/devices/platform/omap/omap_i2c.2/i2c-2/2-0036/brightness";
+#endif
 char const*const KEYBOARD_FILE
         = "/sys/class/leds/button-backlight/brightness";
 
