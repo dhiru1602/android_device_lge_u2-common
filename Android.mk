@@ -1,6 +1,6 @@
 LOCAL_PATH := $(call my-dir)
 
-ifneq ($(filter p760 p768 p765,$(TARGET_DEVICE)),)
+ifneq ($(filter p760 p768 p765 p769,$(TARGET_DEVICE)),)
 
 
 #Creating Gralloc SymLink

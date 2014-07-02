@@ -19,12 +19,7 @@ import static com.android.internal.telephony.RILConstants.*;
 
 import android.content.Context;
 
-import android.media.AudioManager;
-
 import android.os.AsyncResult;
-import android.os.Handler;
-import android.os.HandlerThread;
-import android.os.Looper;
 import android.os.Message;
 import android.os.Parcel;
 
@@ -36,13 +31,6 @@ import android.util.Log;
 
 public class U2RIL extends RIL implements CommandsInterface {
 
-    private AudioManager audioManager;
-    protected HandlerThread mPathThread;
-    protected CallPathHandler mPathHandler;
-
-    private int mCallPath = -1;
-    private boolean mCallInProgress = false;
-
     public U2RIL(Context context, int networkMode, int cdmaSubscription) {
         super(context, networkMode, cdmaSubscription);
         PhoneStateListener mPhoneStateListener = new PhoneStateListener() {
@@ -51,15 +39,6 @@ public class U2RIL extends RIL implements CommandsInterface {
                 /* Higher state wins, unless going back to idle */
                 if (state == TelephonyManager.CALL_STATE_IDLE || state > mCallState)
                     mCallState = state;
-
-
-                /* Loop a speakerphone status check while offhook, to
-                   adjust the model call path accordingly */
-                if (state == TelephonyManager.CALL_STATE_OFFHOOK) {
-                    if (mPathHandler != null) {
-                        mPathHandler.checkSpeakerphoneState();
-                    }
-                }
             }
         };
 
@@ -67,21 +46,11 @@ public class U2RIL extends RIL implements CommandsInterface {
         ((TelephonyManager)context.getSystemService(Context.TELEPHONY_SERVICE))
             .listen(mPhoneStateListener,
                     PhoneStateListener.LISTEN_CALL_STATE);
-
-        audioManager = (AudioManager)context.getSystemService(Context.AUDIO_SERVICE);
-
-        if (mPathHandler == null) {
-            mPathThread = new HandlerThread("CallPathThread");
-            mPathThread.start();
-            mPathHandler = new CallPathHandler(mPathThread.getLooper());
-            mPathHandler.run();
-        }
     }
 
     protected int mCallState = TelephonyManager.CALL_STATE_IDLE;
 
     private int RIL_REQUEST_HANG_UP_CALL = 0xb7;
-    private int RIL_REQUEST_LGE_CPATH = 0xfd;
 
     /* We're not actually changing REQUEST_GET_IMEI, but it's one
        of the first requests made after enabling the radio, and it
@@ -165,18 +134,9 @@ public class U2RIL extends RIL implements CommandsInterface {
     }
 
     static final int RIL_UNSOL_LGE_BATTERY_LEVEL_UPDATE = 1050;
-    static final int RIL_UNSOL_LGE_XCALLSTAT = 1053;
     static final int RIL_UNSOL_LGE_SIM_STATE_CHANGED = 1060;
     static final int RIL_UNSOL_LGE_SIM_STATE_CHANGED_NEW = 1061;
     static final int RIL_UNSOL_LGE_SELECTED_SPEECH_CODEC = 1074;
-
-    private void WriteLgeCPATH(int path) {
-        RILRequest rrLSL = RILRequest.obtain(
-                           RIL_REQUEST_LGE_CPATH, null);
-        rrLSL.mParcel.writeInt(1);
-        rrLSL.mParcel.writeInt(path);
-        send(rrLSL);
-    }
 
     @Override
     protected void
@@ -187,7 +147,6 @@ public class U2RIL extends RIL implements CommandsInterface {
 
         switch(response) {
             case RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED: ret =  responseVoid(p); break;
-            case RIL_UNSOL_LGE_XCALLSTAT: ret =  responseInts(p); break;
             case RIL_UNSOL_LGE_SELECTED_SPEECH_CODEC: ret =  responseVoid(p); break;
             case RIL_UNSOL_LGE_BATTERY_LEVEL_UPDATE: ret =  responseVoid(p); break;
             case RIL_UNSOL_LGE_SIM_STATE_CHANGED:
@@ -202,36 +161,6 @@ public class U2RIL extends RIL implements CommandsInterface {
                 return;
         }
         switch(response) {
-            case RIL_UNSOL_LGE_XCALLSTAT:
-                int[] intArray = (int[]) ret;
-                int xcallState = intArray[1];
-                /* 0 - established
-                 * 2 - dial start
-                 * 3 - dialing
-                 * 4 - incoming
-                 * 6 - hangup
-                 * 7 - answered
-                 */
-                switch (xcallState) {
-                case 2:
-                case 4:
-                    WriteLgeCPATH(1);
-                    mCallPath = 1;
-                    mCallInProgress = true;
-                    break;
-                case 6:
-                    if (mCallPath != 1) {
-                        WriteLgeCPATH(1);
-                    }
-                    WriteLgeCPATH(0);
-                    mCallPath = 0;
-                    mCallInProgress = false;
-                    break;
-                }
-
-                if (RILJ_LOGD) riljLog("LGE call state change > " + intArray[1]);
-
-                break;
             case RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED:
                 /* has bonus radio state int */
                 RadioState newState = getRadioStateFromInt(p.readInt());
@@ -259,51 +188,4 @@ public class U2RIL extends RIL implements CommandsInterface {
         }
 
     }
-
-    class CallPathHandler extends Handler implements Runnable {
-
-        public CallPathHandler (Looper looper) {
-            super(looper);
-        }
-
-        private void checkSpeakerphoneState() {
-            if (mCallState == TelephonyManager.CALL_STATE_OFFHOOK) {
-                int callPath = -1;
-                if (mCallInProgress) {
-                    if (audioManager.isSpeakerphoneOn()) {
-                        callPath = 3;
-                    } else if (audioManager.isBluetoothScoOn()) {
-                        callPath = 4;
-                    } else {
-                        callPath = 1;
-                    }
-                } else {
-                    callPath = 0;
-                }
-
-                if (callPath != mCallPath) {
-                    mCallPath = callPath;
-                    WriteLgeCPATH(callPath);
-                }
-
-                Message msg = obtainMessage();
-                msg.what = 0xc0ffee;
-                sendMessageDelayed(msg, 2500);
-            }
-        }
-
-        @Override
-        public void handleMessage (Message msg) {
-            if (msg.what == 0xc0ffee) {
-                if (mCallState == TelephonyManager.CALL_STATE_OFFHOOK) {
-                    checkSpeakerphoneState();
-                }
-            }
-        }
-
-        @Override
-        public void run () {
-        }
-    }
-
 }

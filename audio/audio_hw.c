@@ -1209,7 +1209,7 @@ static int start_output_stream(struct omap_stream_out *out)
 {
     struct omap_audio_device *adev = out->dev;
     unsigned int card = CARD_OMAP_DEFAULT;
-    unsigned int port = PORT_MM_LP;
+    unsigned int port = PORT_MM;
 
     LOGFUNC("%s(%p)", __FUNCTION__, adev);
 
