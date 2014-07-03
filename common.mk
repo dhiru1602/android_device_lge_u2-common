@@ -73,6 +73,7 @@ PRODUCT_PACKAGES += \
     audio.a2dp.default \
     audio_policy.default \
     audio.primary.u2 \
+    audio.hdmi.u2 \
     audio.usb.default \
     camera.u2 \
     hwcomposer.u2 \
