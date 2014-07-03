@@ -33,6 +33,7 @@ import android.telephony.PhoneStateListener;
 import android.telephony.TelephonyManager;
 
 import android.util.Log;
+import java.util.ArrayList;
 
 public class U2RIL extends RIL implements CommandsInterface {
 
@@ -41,7 +42,7 @@ public class U2RIL extends RIL implements CommandsInterface {
     protected CallPathHandler mPathHandler;
 
     private int mCallPath = -1;
-    private boolean mCallInProgress = false;
+    ArrayList<Integer> mCallList = new ArrayList<Integer>();
 
     public U2RIL(Context context, int networkMode, int cdmaSubscription) {
         super(context, networkMode, cdmaSubscription);
@@ -205,31 +206,39 @@ public class U2RIL extends RIL implements CommandsInterface {
             case RIL_UNSOL_LGE_XCALLSTAT:
                 int[] intArray = (int[]) ret;
                 int xcallState = intArray[1];
+                int xcallID = intArray[0];
                 /* 0 - established
+                 * 1 - on hold
                  * 2 - dial start
                  * 3 - dialing
                  * 4 - incoming
+                 * 5 - call waiting
                  * 6 - hangup
                  * 7 - answered
                  */
                 switch (xcallState) {
-                case 2:
-                case 4:
-                    WriteLgeCPATH(1);
-                    mCallPath = 1;
-                    mCallInProgress = true;
+                case 7:
+                    mCallList.add(xcallID);
+                    if (mCallList.size() == 1) {
+                        WriteLgeCPATH(1);
+                        mCallPath = 1;
+                    }
                     break;
                 case 6:
-                    if (mCallPath != 1) {
-                        WriteLgeCPATH(1);
+                    if(mCallList.contains(xcallID)) {
+                        mCallList.remove(mCallList.indexOf(xcallID));
+                        if (mCallList.size() == 0) {
+                            if (mCallPath != 1) {
+                                WriteLgeCPATH(1);
+                            }
+                            WriteLgeCPATH(0);
+                            mCallPath = 0;
+                        }
                     }
-                    WriteLgeCPATH(0);
-                    mCallPath = 0;
-                    mCallInProgress = false;
                     break;
                 }
 
-                if (RILJ_LOGD) riljLog("LGE call state change > " + intArray[1]);
+                if (RILJ_LOGD) riljLog("LGE XCALLSTAT > {" + xcallID + "," +  xcallState + "}");
 
                 break;
             case RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED:
@@ -269,7 +278,7 @@ public class U2RIL extends RIL implements CommandsInterface {
         private void checkSpeakerphoneState() {
             if (mCallState == TelephonyManager.CALL_STATE_OFFHOOK) {
                 int callPath = -1;
-                if (mCallInProgress) {
+                if (mCallList.size() != 0) {
                     if (audioManager.isSpeakerphoneOn()) {
                         callPath = 3;
                     } else if (audioManager.isBluetoothScoOn()) {
