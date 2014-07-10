@@ -93,7 +93,6 @@ BOARD_HAS_NO_MISC_PARTITION := true
 BOARD_HAS_VIBRATOR_IMPLEMENTATION := ../../device/lge/u2-common/vibrator.c
 
 # Camera
-COMMON_GLOBAL_CFLAGS += -DNEEDS_VECTORIMPL_SYMBOLS
 USE_CAMERA_STUB := false
 
 # External SGX Module
