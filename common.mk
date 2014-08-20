@@ -75,6 +75,7 @@ PRODUCT_PACKAGES += \
     audio.primary.u2 \
     audio.hdmi.u2 \
     audio.usb.default \
+    audio.r_submix.default \
     camera.u2 \
     hwcomposer.u2 \
     power.u2
